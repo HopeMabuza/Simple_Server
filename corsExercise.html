@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <button onclick="callServer()">Call the server</button>
+    <p id="result"></p>
+
+    <script>
+      async function callServer() {
+        try {
+          const res = await fetch('http://localhost:3000/api/hello')
+          const data = await res.json()
+          document.getElementById('result').innerText = data.message
+        } catch (err) {
+          document.getElementById('result').innerText = 'Error: ' + err.message
+        }
+      }
+    </script>
+  </body>
+</html>
