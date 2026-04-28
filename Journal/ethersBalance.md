@@ -1,6 +1,8 @@
 # Reading an ERC-20 Balance with ethers.js
 
-By the end of this guide you will have a live Express endpoint that connects to the Ethereum blockchain, reads a real ERC-20 token balance from a wallet address, and returns it as clean JSON.
+By the end of this guide you will have a live Express endpoint that connects to the Sepolia testnet, reads a real ERC-20 token balance from a wallet address, and returns it as clean JSON.
+
+We use Sepolia instead of mainnet so you can test with real blockchain calls without spending real ETH.
 
 ---
 
@@ -12,13 +14,14 @@ A URL that looks like this:
 http://localhost:3000/api/balance/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
 ```
 
-Where the address at the end is any wallet. The server connects to the blockchain, reads that wallet's USDC balance, and returns:
+Where the address at the end is any wallet. The server connects to Sepolia, reads that wallet's LINK balance, and returns:
 
 ```json
 {
   "wallet": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-  "token": "USDC",
-  "balance": "420.50"
+  "network": "sepolia",
+  "token": "LINK",
+  "balance": "25.0"
 }
 ```
 
@@ -51,7 +54,7 @@ my-server/
 Create a file called `.env` in your project folder:
 
 ```
-ALCHEMY_URL=https://eth-mainnet.g.alchemy.com/v2/your_key_here
+ALCHEMY_URL=https://eth-sepolia.g.alchemy.com/v2/your_key_here
 ```
 
 Replace `your_key_here` with your actual Alchemy API key.
@@ -85,18 +88,22 @@ const ERC20_ABI = [
   'function symbol() view returns (string)'
 ]
 
-// USDC contract address on Ethereum mainnet
-const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+// LINK token on Sepolia testnet
+const LINK_ADDRESS = '0x779877A7B0D9E8603169DdbD7836e478b4624789'
 
-// Connect to Ethereum via Alchemy
+// Connect to Sepolia via Alchemy
 const provider = new ethers.JsonRpcProvider(process.env.ALCHEMY_URL)
 
 app.get('/api/balance/:address', async (req, res) => {
   try {
     const { address } = req.params
 
-    // Connect to the USDC contract
-    const contract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, provider)
+    if (!ethers.isAddress(address)) {
+      return res.status(400).json({ error: 'Invalid wallet address' })
+    }
+
+    // Connect to the LINK contract on Sepolia
+    const contract = new ethers.Contract(LINK_ADDRESS, ERC20_ABI, provider)
 
     // Read from the contract — free, no gas needed
     const [rawBalance, decimals, symbol] = await Promise.all([
@@ -110,6 +117,7 @@ app.get('/api/balance/:address', async (req, res) => {
 
     res.json({
       wallet: address,
+      network: 'sepolia',
       token: symbol,
       balance: formatted
     })
@@ -146,7 +154,7 @@ For standard contracts like ERC-20 you only need to list the functions you actua
 const provider = new ethers.JsonRpcProvider(process.env.ALCHEMY_URL)
 ```
 
-This is how your server talks to Ethereum. Alchemy is the middleman — they run the node, you just send requests through their URL. Your key is loaded from `.env` so it never appears in your code.
+This is how your server talks to Ethereum. Alchemy is the middleman — they run the node, you just send requests through their URL. By using `eth-sepolia` in the URL you are pointing at the Sepolia testnet instead of mainnet. Your key is loaded from `.env` so it never appears in your code.
 
 ### Reading from the contract
 
@@ -200,21 +208,24 @@ Start your server:
 node index.js
 ```
 
-Test it in your browser or terminal with a known wallet address:
+Test it in your browser or terminal with your own wallet address:
 
 ```bash
-curl http://localhost:3000/api/balance/0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+curl http://localhost:3000/api/balance/your_wallet_address
 ```
 
 You should get back:
 
 ```json
 {
-  "wallet": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-  "token": "USDC",
-  "balance": "420.50"
+  "wallet": "0xYourAddress",
+  "network": "sepolia",
+  "token": "LINK",
+  "balance": "25.0"
 }
 ```
+
+If your balance shows `"0.0"` your wallet just has no Sepolia LINK yet — see Task 1 in the exercise below to fix that.
 
 ---
 
@@ -222,11 +233,17 @@ You should get back:
 
 Now that the base endpoint works, complete these tasks one at a time to solidify your understanding.
 
-### Task 1 — Check your own wallet
+### Task 1 — Get testnet LINK and check your balance
 
-Replace the address in the URL with your own wallet address and confirm your real USDC balance comes back. You can verify it against what Etherscan shows at `etherscan.io/address/your_address`.
+Your wallet probably has zero Sepolia LINK right now. Grab some free testnet LINK from the Chainlink faucet:
 
-### Task 2 — Add ETH balance alongside the token balance
+1. Go to `faucets.chain.link`
+2. Connect your wallet and select Sepolia
+3. Request LINK — it arrives in about 30 seconds
+
+Then hit your endpoint with your wallet address and confirm the balance comes back.
+
+### Task 2 — Add Sepolia ETH balance alongside the token balance
 
 ethers.js can also fetch the native ETH balance using the provider directly — no contract or ABI needed:
 
@@ -239,24 +256,34 @@ Add this inside your route and include `eth: formattedEth` in the response:
 
 ```json
 {
-  "wallet": "0xd8dA6...",
-  "token": "USDC",
-  "balance": "420.50",
-  "eth": "1.25"
+  "wallet": "0xYourAddress",
+  "network": "sepolia",
+  "token": "LINK",
+  "balance": "25.0",
+  "eth": "0.5"
 }
 ```
 
-### Task 3 — Read a different ERC-20 token
+You can get free Sepolia ETH from `sepoliafaucet.com` if your wallet needs it.
 
-Swap `USDC_ADDRESS` for the USDT contract address on mainnet:
+### Task 3 — Switching back to mainnet
+
+When you are ready to point at mainnet instead of Sepolia, only two things change:
 
 ```
-0xdAC17F958D2ee523a2206206994597C13D831ec7
+# .env
+ALCHEMY_URL=https://eth-mainnet.g.alchemy.com/v2/your_key_here
 ```
 
-Restart your server and call the same endpoint. The `symbol` field in the response should now say `"USDT"` instead of `"USDC"` — same code, different contract.
+```js
+// index.js — swap to a mainnet token address e.g. USDC
+const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'
+const contract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, provider)
+```
 
-### Task 4 — Handle an invalid address
+Restart your server and everything else — the route, ABI, formatting — works identically on mainnet.
+
+### Task 4 — Test the invalid address guard
 
 Call your endpoint with a made-up address:
 
@@ -264,7 +291,13 @@ Call your endpoint with a made-up address:
 curl http://localhost:3000/api/balance/0xINVALID
 ```
 
-You should get back a `500` error response from your try/catch. Now add a validation check at the top of your route before the contract call:
+You should get back a clean `400` error:
+
+```json
+{ "error": "Invalid wallet address" }
+```
+
+This comes from the `ethers.isAddress()` check already in the code. If you removed it accidentally, add it back at the top of your route:
 
 ```js
 if (!ethers.isAddress(address)) {
@@ -272,17 +305,25 @@ if (!ethers.isAddress(address)) {
 }
 ```
 
-This returns a `400` (bad request) instead of a `500` (server error) — more accurate and easier to debug from the frontend.
-
 ---
 
 ## The pattern to remember
 
-When you want to use your own token contract instead of USDC, just swap two things:
+When you want to use your own token contract instead of LINK, just swap two things:
 
 ```js
 const YOUR_TOKEN_ADDRESS = '0xYourContractAddressHere'
 const contract = new ethers.Contract(YOUR_TOKEN_ADDRESS, ERC20_ABI, provider)
 ```
 
-Everything else — the route, the formatting, the error handling — stays exactly the same.
+And when switching networks, just update your `.env`:
+
+```
+# Sepolia testnet
+ALCHEMY_URL=https://eth-sepolia.g.alchemy.com/v2/your_key_here
+
+# Mainnet (when you are ready to go live)
+ALCHEMY_URL=https://eth-mainnet.g.alchemy.com/v2/your_key_here
+```
+
+Everything else — the route, the ABI, the formatting, the error handling — stays exactly the same regardless of network or token.
